@@ -979,8 +979,18 @@ func (args Arguments) Diff(objects []interface{}) (string, int) {
 			}
 		} else {
 			actual = objects[i]
-			actualFmt = func() string {
-				return fmt.Sprintf("(%[1]T=%[1]v)", actual)
+			// Note: avoid %v format specifier for pointer arguments. The %v format
+			// specifier traverses the data structure, and for situations where the
+			// argument is a pointer (that may be updated concurrently) this can result
+			// in the mock code causing a data race when running go test -race.
+			if isPtr(actual) {
+				actualFmt = func() string {
+					return fmt.Sprintf("(%[1]T=%[1]p)", actual)
+				}
+			} else {
+				actualFmt = func() string {
+					return fmt.Sprintf("(%[1]T=%[1]v)", actual)
+				}
 			}
 		}
 
@@ -991,8 +1001,18 @@ func (args Arguments) Diff(objects []interface{}) (string, int) {
 			}
 		} else {
 			expected = args[i]
-			expectedFmt = func() string {
-				return fmt.Sprintf("(%[1]T=%[1]v)", expected)
+			// Note: avoid %v format specifier for pointer arguments. The %v format
+			// specifier traverses the data structure, and for situations where the
+			// argument is a pointer (that may be updated concurrently) this can result
+			// in the mock code causing a data race when running go test -race.
+			if isPtr(expected) {
+				expectedFmt = func() string {
+					return fmt.Sprintf("(%[1]T=%[1]p)", expected)
+				}
+			} else {
+				expectedFmt = func() string {
+					return fmt.Sprintf("(%[1]T=%[1]v)", expected)
+				}
 			}
 		}
 
@@ -1333,4 +1353,9 @@ func isFuncSame(f1, f2 *runtime.Func) bool {
 	f2File, f2Loc := f2.FileLine(f2.Entry())
 
 	return f1File == f2File && f1Loc == f2Loc
+}
+
+// isPtr indicates if the supplied value is a pointer.
+func isPtr(v interface{}) bool {
+	return reflect.ValueOf(v).Kind() == reflect.Ptr
 }
